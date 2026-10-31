@@ -99,3 +99,8 @@ class MainWindow(QWidget):
         self._input.setEnabled(not busy)
         self._send_button.setEnabled(not busy)
         self._send_button.setText("处理中…" if busy else "发送")
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        # 点关闭按钮只隐藏窗口，程序继续在悬浮球/托盘中常驻
+        event.ignore()
+        self.hide()

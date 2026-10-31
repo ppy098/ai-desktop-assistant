@@ -1,0 +1,11 @@
+# GUI 界面框架
+PySide6>=6.7,<7
+
+# 在线大模型调用（OpenAI 兼容协议，支持豆包/DeepSeek/OpenAI 等）
+openai>=1.40
+
+# 从 .env 文件读取环境变量
+python-dotenv>=1.0
+
+# 单元测试（开发依赖）
+pytest>=8.0

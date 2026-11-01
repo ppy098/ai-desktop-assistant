@@ -1,8 +1,9 @@
-"""配置加载：优先读取项目根目录下的 .env，其次读取系统环境变量。"""
+"""配置加载：优先读取 .env（源码运行时在项目根目录，打包后在 exe 旁），其次读取系统环境变量。"""
 
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,7 +11,10 @@ from dotenv import load_dotenv
 
 
 def _project_root() -> Path:
-    # 当前文件：src/ai_assistant/core/config.py，向上四级即项目根目录
+    # PyInstaller 打包后 __file__ 位于 _internal 内，改为读 exe 所在目录
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    # 源码运行：当前文件 src/ai_assistant/core/config.py，向上三级即项目根目录
     return Path(__file__).resolve().parents[3]
 
 

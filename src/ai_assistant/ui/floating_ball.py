@@ -53,8 +53,9 @@ def create_ball_icon(size: int = 64) -> QIcon:
 class FloatingBall(QWidget):
     """悬浮球窗口。"""
 
-    request_show_main = Signal()
+    request_toggle_panel = Signal()
     request_quit = Signal()
+    position_changed = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -71,8 +72,8 @@ class FloatingBall(QWidget):
         self._moved = False
 
         self._menu = QMenu(self)
-        show_action = QAction("打开主窗口", self)
-        show_action.triggered.connect(self.request_show_main)
+        show_action = QAction("展开面板", self)
+        show_action.triggered.connect(self.request_toggle_panel)
         quit_action = QAction("退出", self)
         quit_action.triggered.connect(self.request_quit)
         self._menu.addAction(show_action)
@@ -116,10 +117,11 @@ class FloatingBall(QWidget):
             if distance > _CLICK_THRESHOLD:
                 self._moved = True
                 self.move(event.globalPosition().toPoint() - self._drag_offset)
+                self.position_changed.emit()
 
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802
         if event.button() == Qt.LeftButton and not self._moved:
-            self.request_show_main.emit()
+            self.request_toggle_panel.emit()
 
     def contextMenuEvent(self, event) -> None:  # noqa: N802
         self._menu.exec(event.globalPos())

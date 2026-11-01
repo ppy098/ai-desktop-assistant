@@ -20,59 +20,10 @@ from PySide6.QtWidgets import (
 
 from ..core.agent import AgentResponse, Assistant
 from ..core.config import Settings
+from .themes import Theme, get_theme, panel_style
 
 PANEL_WIDTH = 400
 PANEL_HEIGHT = 480
-
-_STYLE = """
-QWidget#panel {
-    background: #ffffff;
-    border-radius: 14px;
-    border: 1px solid rgba(47, 128, 237, 0.45);
-}
-QLabel#title {
-    color: #1f2328;
-    font-size: 14px;
-    font-weight: bold;
-    background: transparent;
-}
-QPushButton#close_btn {
-    border: none;
-    background: transparent;
-    color: #57606a;
-    font-size: 14px;
-    padding: 2px 8px;
-}
-QPushButton#close_btn:hover {
-    background: #f0f1f3;
-    border-radius: 6px;
-    color: #cf222e;
-}
-QTextBrowser#chat {
-    border: none;
-    background: #fafbfc;
-    border-radius: 10px;
-    padding: 8px;
-    font-size: 13px;
-}
-QLineEdit#input {
-    border: 1px solid #d0d7de;
-    border-radius: 8px;
-    padding: 6px 10px;
-    font-size: 13px;
-    background: #ffffff;
-}
-QPushButton#send {
-    background: #2f80ed;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 6px 16px;
-    font-size: 13px;
-}
-QPushButton#send:hover { background: #1f6fd0; }
-QPushButton#send:disabled { background: #a5b6cf; }
-"""
 
 
 class _Worker(QObject):
@@ -91,11 +42,13 @@ class MainPanel(QWidget):
     """从悬浮球后面展开的对话面板。"""
 
     request_collapse = Signal()
+    request_open_settings = Signal()
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, theme: Theme | None = None):
         super().__init__()
         self._assistant = Assistant(settings)
         self._thread: QThread | None = None
+        self._theme = theme or get_theme(settings.theme)
 
         self.setWindowFlags(
             Qt.FramelessWindowHint
@@ -105,16 +58,18 @@ class MainPanel(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setFixedSize(PANEL_WIDTH, PANEL_HEIGHT)
         self.setObjectName("panel")
-        self.setStyleSheet(_STYLE)
+        self.apply_theme(self._theme)
 
-        # 顶部栏：标题 + 收起按钮
+        # 顶部栏：标题 + 模式 + 设置 + 收起
         title = QLabel("AI 桌面助手")
         title.setObjectName("title")
-        mode_text = "在线模式" if settings.has_api_key else "本地规则模式（未配置 API Key）"
-        self._mode_label = QLabel(mode_text)
-        self._mode_label.setStyleSheet(
-            "color: #8a6d00; font-size: 11px; background: transparent;"
-        )
+        self._mode_label = QLabel()
+        self._mode_label.setObjectName("mode_label")
+
+        settings_btn = QPushButton("⚙")
+        settings_btn.setObjectName("close_btn")
+        settings_btn.setToolTip("设置")
+        settings_btn.clicked.connect(self.request_open_settings)
         close_btn = QPushButton("✕")
         close_btn.setObjectName("close_btn")
         close_btn.setToolTip("收起面板")
@@ -124,6 +79,7 @@ class MainPanel(QWidget):
         head.addWidget(title)
         head.addStretch(1)
         head.addWidget(self._mode_label)
+        head.addWidget(settings_btn)
         head.addWidget(close_btn)
 
         self._chat = QTextBrowser()
@@ -150,6 +106,37 @@ class MainPanel(QWidget):
         layout.addWidget(self._chat, stretch=1)
         layout.addLayout(bottom)
 
+        self.update_mode(settings)
+
+    # ------------------------------------------------------------------
+    # 主题 / 模式
+    # ------------------------------------------------------------------
+
+    def apply_theme(self, theme: Theme) -> None:
+        """应用皮肤（QSS），并同步模式标签颜色。"""
+        self._theme = theme
+        self.setStyleSheet(panel_style(theme))
+        if hasattr(self, "_mode_label"):
+            color = theme.mode_online if self._mode == "online" else theme.mode_local
+            self._mode_label.setStyleSheet(f"color: {color}; font-size: 11px; background: transparent;")
+
+    def update_mode(self, settings: Settings) -> None:
+        """刷新模式标签：在线 / 本地规则。"""
+        self._mode = "online" if settings.has_api_key else "local"
+        text = "在线模式" if self._mode == "online" else "本地规则模式（未配置 API Key）"
+        self._mode_label.setText(text)
+        color = self._theme.mode_online if self._mode == "online" else self._theme.mode_local
+        self._mode_label.setStyleSheet(f"color: {color}; font-size: 11px; background: transparent;")
+
+    def update_settings(self, settings: Settings) -> None:
+        """设置保存后刷新：替换 Assistant（新的 Key/模型）并更新模式。"""
+        self._assistant = Assistant(settings)
+        self.update_mode(settings)
+
+    # ------------------------------------------------------------------
+    # 对话逻辑
+    # ------------------------------------------------------------------
+
     def _on_send(self) -> None:
         text = self._input.text().strip()
         if not text or self._thread is not None:
@@ -173,7 +160,7 @@ class MainPanel(QWidget):
     def _on_finished(self, response: AgentResponse) -> None:
         self._thread = None
         self._set_busy(False)
-        color = "#1a7f37" if response.mode == "online" else "#8a6d00"
+        color = self._theme.mode_online if response.mode == "online" else self._theme.mode_local
         self._chat.append(
             f"<b style='color:{color}'>助手：</b>{escape(response.reply)}<br><br>"
         )

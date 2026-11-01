@@ -3,7 +3,7 @@
 交互：
 - 单击悬浮球：从球位置滑出/收起对话面板（非独立窗口）；
 - 拖动悬浮球：面板若展开则跟随移动；
-- 托盘：双击或菜单唤起面板。
+- 设置：球右键 / 托盘菜单 / 面板齿轮，可配置 API Key 与个性化皮肤。
 """
 
 from __future__ import annotations
@@ -13,29 +13,35 @@ import sys
 from PySide6.QtCore import QEasingCurve, QPoint, QVariantAnimation
 from PySide6.QtWidgets import QApplication
 
-from .core.config import load_settings
-from .ui.floating_ball import BALL_SIZE, FloatingBall
+from .core.config import load_settings, save_settings
+from .ui.floating_ball import BALL_SIZE, FloatingBall, create_ball_icon
 from .ui.main_window import PANEL_HEIGHT, PANEL_WIDTH, MainPanel
+from .ui.settings_dialog import SettingsDialog
+from .ui.themes import get_theme
 from .ui.tray import TrayIcon
 
 
 class ApplicationController:
-    """协调悬浮球、托盘与对话面板的展开收起。"""
+    """协调悬浮球、托盘、对话面板与设置。"""
 
     def __init__(self) -> None:
-        self._panel = MainPanel(load_settings())
-        self._panel.request_collapse.connect(self.collapse_panel)
+        self._settings = load_settings()
 
-        self._ball = FloatingBall()
+        self._panel = MainPanel(self._settings)
+        self._panel.request_collapse.connect(self.collapse_panel)
+        self._panel.request_open_settings.connect(self.open_settings)
+
+        self._ball = FloatingBall(get_theme(self._settings.theme))
         self._ball.request_toggle_panel.connect(self.toggle_panel)
+        self._ball.request_open_settings.connect(self.open_settings)
         self._ball.request_quit.connect(self.quit)
         self._ball.position_changed.connect(self._on_ball_moved)
         self._ball.show()
 
-        self._tray = TrayIcon(self.show_panel, self.quit)
+        self._tray = TrayIcon(self.show_panel, self.open_settings, self.quit)
         self._tray.show()
 
-        self._anim: QPropertyAnimation | None = None
+        self._anim: QVariantAnimation | None = None
 
     # ------------------------------------------------------------------
     # 展开 / 收起
@@ -117,6 +123,22 @@ class ApplicationController:
             if self._anim is not None:
                 self._anim.stop()
             self._panel.move(self._panel_pos())
+
+    # ------------------------------------------------------------------
+    # 设置
+    # ------------------------------------------------------------------
+
+    def open_settings(self) -> None:
+        dialog = SettingsDialog(self._settings, parent=self._panel)
+        if dialog.exec():
+            self._settings = dialog.saved_settings
+            save_settings(self._settings)
+            # 应用新皮肤、新模式与新 Key
+            theme = get_theme(self._settings.theme)
+            self._panel.update_settings(self._settings)
+            self._panel.apply_theme(theme)
+            self._ball.apply_theme(theme)
+            self._tray.setIcon(create_ball_icon(48, theme))
 
     def quit(self) -> None:
         self._tray.hide()

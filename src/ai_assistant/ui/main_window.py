@@ -116,7 +116,7 @@ class MainPanel(QWidget):
         """应用皮肤（QSS），并同步模式标签颜色。"""
         self._theme = theme
         self.setStyleSheet(panel_style(theme))
-        if hasattr(self, "_mode_label"):
+        if hasattr(self, "_mode"):
             color = theme.mode_online if self._mode == "online" else theme.mode_local
             self._mode_label.setStyleSheet(f"color: {color}; font-size: 11px; background: transparent;")
 

@@ -87,10 +87,19 @@ class FloatingBall(QWidget):
 
     def move_to_bottom_right(self) -> None:
         """定位到主屏幕可用区域（排除任务栏）的右下角。"""
-        screen = self.screen().availableGeometry()
-        x = screen.right() - BALL_SIZE - 12
-        y = screen.bottom() - BALL_SIZE - 12
+        screen = self.screen() or self._primary_screen()
+        if screen is None:  # 极端情况下无法获取屏幕时保持默认位置
+            return
+        available = screen.availableGeometry()
+        x = available.right() - BALL_SIZE - 12
+        y = available.bottom() - BALL_SIZE - 12
         self.move(x, y)
+
+    @staticmethod
+    def _primary_screen():
+        from PySide6.QtWidgets import QApplication
+
+        return QApplication.primaryScreen()
 
     def paintEvent(self, event) -> None:  # noqa: N802 - Qt 命名
         painter = QPainter(self)

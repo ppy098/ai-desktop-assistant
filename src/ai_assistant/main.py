@@ -14,7 +14,7 @@ from PySide6.QtCore import QEasingCurve, QPoint, QVariantAnimation
 from PySide6.QtWidgets import QApplication
 
 from .core.config import load_settings, save_settings
-from .ui.floating_ball import BALL_SIZE, FloatingBall, create_ball_icon
+from .ui.floating_ball import BALL_SIZE, FloatingBall
 from .ui.main_window import PANEL_HEIGHT, PANEL_WIDTH, MainPanel
 from .ui.settings_dialog import SettingsDialog
 from .ui.themes import get_theme
@@ -38,7 +38,12 @@ class ApplicationController:
         self._ball.position_changed.connect(self._on_ball_moved)
         self._ball.show()
 
-        self._tray = TrayIcon(self.show_panel, self.open_settings, self.quit)
+        self._tray = TrayIcon(
+            self.show_panel,
+            self.open_settings,
+            self.quit,
+            theme=get_theme(self._settings.theme),
+        )
         self._tray.show()
 
         self._anim: QVariantAnimation | None = None
@@ -138,7 +143,7 @@ class ApplicationController:
             self._panel.update_settings(self._settings)
             self._panel.apply_theme(theme)
             self._ball.apply_theme(theme)
-            self._tray.setIcon(create_ball_icon(48, theme))
+            self._tray.apply_theme(theme)
 
     def quit(self) -> None:
         self._tray.hide()

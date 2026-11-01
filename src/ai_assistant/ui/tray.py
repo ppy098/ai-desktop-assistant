@@ -6,12 +6,14 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
 from .floating_ball import create_ball_icon
+from .themes import Theme, get_theme
 
 
 class TrayIcon(QSystemTrayIcon):
-    def __init__(self, on_show_panel, on_settings, on_quit) -> None:
+    def __init__(self, on_show_panel, on_settings, on_quit, theme: Theme | None = None) -> None:
         super().__init__()
-        self.setIcon(create_ball_icon(48))
+        self._theme = theme or get_theme(None)
+        self.setIcon(create_ball_icon(48, self._theme))
         self.setToolTip("AI 桌面助手 - 单击悬浮球唤起")
 
         menu = QMenu()
@@ -33,3 +35,8 @@ class TrayIcon(QSystemTrayIcon):
             if reason == QSystemTrayIcon.DoubleClick
             else None
         )
+
+    def apply_theme(self, theme: Theme) -> None:
+        """换肤时同步托盘图标颜色。"""
+        self._theme = theme
+        self.setIcon(create_ball_icon(48, theme))

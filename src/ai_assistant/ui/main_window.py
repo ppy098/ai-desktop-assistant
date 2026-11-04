@@ -37,7 +37,7 @@ _HISTORY_RESTORE_LIMIT = 20
 
 _WELCOME = (
     "你好，我是 AI 桌面助手。可以帮你打开软件、创建文件、浏览器搜索、"
-    "打开网址、截屏、读写剪贴板、查看电脑状态、一键优化内存。<br>"
+    "打开网址、截屏、读写剪贴板、查看电脑状态、一键优化内存、清理磁盘垃圾。<br>"
 )
 
 # 快捷按钮：显示文字 -> 提交的指令；指令为空表示特殊动作
@@ -47,6 +47,7 @@ _CHIPS: tuple[tuple[str, str], ...] = (
     ("剪贴板", "看看剪贴板"),
     ("电脑状态", "电脑状态"),
     ("优化内存", "优化内存"),
+    ("清理磁盘", "清理磁盘"),
 )
 
 
@@ -197,7 +198,7 @@ class MainPanel(QWidget):
         chips_host.setFixedHeight(28)
         chips = QHBoxLayout(chips_host)
         chips.setContentsMargins(0, 0, 0, 0)
-        chips.setSpacing(6)
+        chips.setSpacing(5)
         for label, command in _CHIPS:
             chip = QPushButton(label)
             chip.setObjectName("chip")

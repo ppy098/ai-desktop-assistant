@@ -363,6 +363,10 @@ _SE_PRIVILEGE_ENABLED = 0x0002
 _ERROR_NOT_ALL_ASSIGNED = 1300
 
 _SYSTEM_MEMORY_LIST_INFORMATION = 80
+_MEMORY_EMPTY_WORKING_SETS = 2
+_MEMORY_FLUSH_MODIFIED_LIST = 3
+_MEMORY_PURGE_STANDBY_LIST = 4
+_MEMORY_PURGE_LOW_PRIORITY_STANDBY = 5
 _MEMORY_PURGE_STANDBY_LIST = 4
 
 
@@ -422,6 +426,24 @@ def _enable_privilege(name: str) -> bool:
             ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(token.value))
         except (AttributeError, OSError):
             pass
+
+
+def _memory_list_command(command: int) -> bool:
+    """执行一个 SYSTEM_MEMORY_LIST_COMMAND（3=刷已修改页 4=清空待机 5=清低优先级待机）。
+
+    需要 SeProfileSingleProcessPrivilege；拿不到时 NtSetSystemInformation 会返回错误码。
+    """
+    try:
+        ntdll = ctypes.windll.ntdll
+        ntdll.NtSetSystemInformation.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_ulong]
+        ntdll.NtSetSystemInformation.restype = ctypes.c_long
+        value = ctypes.c_ulong(command)
+        status = ntdll.NtSetSystemInformation(
+            _SYSTEM_MEMORY_LIST_INFORMATION, ctypes.byref(value), ctypes.sizeof(value)
+        )
+        return status == 0
+    except (AttributeError, OSError):
+        return False
 
 
 def _purge_standby_list() -> bool:
@@ -494,7 +516,11 @@ def _empty_working_sets(min_mb: int) -> tuple[int, int, float]:
 
 
 
-_ELEVATED_RESULT = Path.home() / ".ai_desktop_assistant" / "elevated_optimize.json"
+_ELEVATED_DIR = Path.home() / ".ai_desktop_assistant"
+_ELEVATED_FILES = {
+    "memory": _ELEVATED_DIR / "elevated_optimize.json",
+    "disk": _ELEVATED_DIR / "elevated_clean_disk.json",
+}
 
 
 def _is_admin() -> bool:
@@ -505,19 +531,21 @@ def _is_admin() -> bool:
         return False
 
 
-def _run_elevated(timeout: float = 30.0) -> ToolResult | None:
-    """以管理员身份启动自身执行一次完整优化，读取它写回的结果。
+def _run_elevated(mode: str = "memory", timeout: float = 60.0) -> ToolResult | None:
+    """以管理员身份启动自身执行一次动作，读取它写回的结果。
 
-    用户在弹出的 UAC 对话框里点“是”才会执行；点“否”返回 None（调用方降级）。
+    mode 为 "memory"（--optimize-memory）或 "disk"（--clean-disk）。
+    用户在 UAC 里点“是”才会执行；点“否”（ShellExecute 返回 1223）时返回 None，调用方降级。
     """
+    flag = {"memory": "--optimize-memory", "disk": "--clean-disk"}.get(mode)
+    if flag is None:
+        return None
     exe = sys.executable
-    if getattr(sys, "frozen", False):
-        params = "--optimize-memory"
-    else:
-        params = f"-m ai_assistant --optimize-memory"
+    params = flag if getattr(sys, "frozen", False) else f"-m ai_assistant {flag}"
 
+    result_file = _ELEVATED_FILES[mode]
     try:
-        _ELEVATED_RESULT.unlink()
+        result_file.unlink()
     except OSError:
         pass
 
@@ -525,19 +553,19 @@ def _run_elevated(timeout: float = 30.0) -> ToolResult | None:
         ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, params, None, 0)
     except (AttributeError, OSError):
         return None
-    if ret <= 32:  # 32 及以下都是失败，1223 = 用户在 UAC 里点了“否”
+    if ret <= 32:  # 32 及以下都是失败
         return None
 
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        if _ELEVATED_RESULT.exists():
+        if result_file.exists():
             try:
-                payload = json.loads(_ELEVATED_RESULT.read_text(encoding="utf-8"))
+                payload = json.loads(result_file.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 time.sleep(0.2)
                 continue
             try:
-                _ELEVATED_RESULT.unlink()
+                result_file.unlink()
             except OSError:
                 pass
             return ToolResult(
@@ -549,11 +577,14 @@ def _run_elevated(timeout: float = 30.0) -> ToolResult | None:
     return None
 
 
-def _write_elevated_result(result: ToolResult) -> None:
+def _write_elevated_result(result: ToolResult, mode: str = "memory") -> None:
     """提权子进程把结果写回文件，供父进程读取。"""
+    result_file = _ELEVATED_FILES.get(mode)
+    if result_file is None:
+        return
     try:
-        _ELEVATED_RESULT.parent.mkdir(parents=True, exist_ok=True)
-        _ELEVATED_RESULT.write_text(
+        result_file.parent.mkdir(parents=True, exist_ok=True)
+        result_file.write_text(
             json.dumps(
                 {
                     "success": result.success,
@@ -569,16 +600,16 @@ def _write_elevated_result(result: ToolResult) -> None:
 
 
 def optimize_memory(min_mb: int = 8, elevate: bool = True) -> ToolResult:
-    """一键内存优化（PCL2 同款三步）：清待机列表 → 清文件缓存 → 整理进程工作集。
+    """一键内存优化（PCL2 同款五步）：
 
-    前两步需要管理员令牌里的特权，普通权限下会自动跳过，只做第三步。
+    整理进程工作集 → 刷已修改页 → 清低优先级待机 → 清空待机列表 → 清系统文件缓存。
+    后四项需要管理员令牌里的特权，普通权限下会自动跳过并如实说明。
     """
     if os.name != "nt":
         return ToolResult(False, "内存优化目前只支持 Windows 系统")
 
-    # 非管理员：用 UAC 提权执行完整三步（清待机列表/文件缓存都要求管理员）
     if elevate and not _is_admin():
-        elevated = _run_elevated()
+        elevated = _run_elevated("memory")
         if elevated is not None:
             return elevated
 
@@ -586,8 +617,22 @@ def optimize_memory(min_mb: int = 8, elevate: bool = True) -> ToolResult:
     steps: list[str] = []
     limited = False
 
-    if _enable_privilege("SeProfileSingleProcessPrivilege") and _purge_standby_list():
-        steps.append("清空待机内存列表")
+    # 先整理工作集：页会转入待机/已修改列表，再由后面的步骤统一回收
+    trimmed, _skipped, touched_mb = _empty_working_sets(min_mb)
+    if trimmed:
+        steps.append(f"整理 {trimmed} 个进程工作集")
+
+    if _enable_privilege("SeProfileSingleProcessPrivilege"):
+        if _memory_list_command(_MEMORY_FLUSH_MODIFIED_LIST):
+            steps.append("写出已修改页")
+        else:
+            limited = True
+        if _memory_list_command(_MEMORY_PURGE_LOW_PRIORITY_STANDBY):
+            steps.append("清低优先级待机内存")
+        if _memory_list_command(_MEMORY_PURGE_STANDBY_LIST):
+            steps.append("清空待机内存列表")
+        else:
+            limited = True
     else:
         limited = True
 
@@ -595,10 +640,6 @@ def optimize_memory(min_mb: int = 8, elevate: bool = True) -> ToolResult:
         steps.append("清理系统文件缓存")
     else:
         limited = True
-
-    trimmed, _skipped, touched_mb = _empty_working_sets(min_mb)
-    if trimmed:
-        steps.append(f"整理 {trimmed} 个进程工作集")
 
     time.sleep(0.8)  # 清空待机列表后系统需要一点时间把页转为空闲，等一下再统计更准
     after = _memory_status()
@@ -619,7 +660,7 @@ def optimize_memory(min_mb: int = 8, elevate: bool = True) -> ToolResult:
         text = f"内存优化完成（{'、'.join(steps)}）"
 
     if limited:
-        text += "。清空待机列表/系统缓存需要管理员权限，请在 UAC 弹窗里点“是”，或在 UAC 取消后重试"
+        text += "。清待机列表/系统缓存需要管理员权限，请在 UAC 弹窗里点“是”"
 
     return ToolResult(
         True,
@@ -633,3 +674,146 @@ def optimize_memory(min_mb: int = 8, elevate: bool = True) -> ToolResult:
         },
     )
 
+
+# ----------------------------------------------------------------------
+# 磁盘清理（临时文件 / 更新缓存 / 回收站 / 缩略图 / 错误报告）
+# ----------------------------------------------------------------------
+
+_DISK_TARGETS: tuple[tuple[str, str], ...] = (
+    ("用户临时文件", os.environ.get("TEMP") or str(Path.home() / "AppData" / "Local" / "Temp")),
+    ("系统临时文件", r"C:\Windows\Temp"),
+    ("Windows 更新缓存", r"C:\Windows\SoftwareDistribution\Download"),
+    ("错误报告缓存", r"C:\ProgramData\Microsoft\Windows\WER\ReportArchive"),
+    ("错误报告缓存", r"C:\ProgramData\Microsoft\Windows\WER\ReportQueue"),
+    ("传递优化缓存", r"C:\ProgramData\Microsoft\Windows\DeliveryOptimization\Cache"),
+)
+
+_DISK_KEEP_FILES = {"desktop.ini", "thumbs.db"}
+
+
+def _folder_bytes(path: Path) -> int:
+    """统计目录总字节数（不跟随符号链接，读不到的跳过）。"""
+    total = 0
+    if not path.is_dir():
+        return total
+    for root, _dirs, files in os.walk(path, followlinks=False, onerror=lambda exc: None):
+        for name in files:
+            try:
+                total += os.path.getsize(os.path.join(root, name))
+            except OSError:
+                continue
+    return total
+
+
+def _clear_folder(path: Path) -> None:
+    """清空目录内的文件（保留目录本身与正在占用/无权限删除的文件）。"""
+    if not path.is_dir():
+        return
+    for root, _dirs, files in os.walk(path, followlinks=False, onerror=lambda exc: None):
+        for name in files:
+            if name.lower() in _DISK_KEEP_FILES:
+                continue
+            try:
+                os.remove(os.path.join(root, name))
+            except OSError:
+                continue
+
+
+def _clear_thumbnails() -> int:
+    """删除资源管理器缩略图缓存（系统会自动重建）。"""
+    folder = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "Windows" / "Explorer"
+    if not folder.is_dir():
+        return 0
+    freed = 0
+    try:
+        for item in folder.glob("thumbcache_*.db"):
+            try:
+                size = item.stat().st_size
+                item.unlink()
+                freed += size
+            except OSError:
+                continue
+    except OSError:
+        pass
+    return freed
+
+
+def _empty_recycle_bin() -> bool:
+    """清空回收站（不弹确认框、不显示进度、不出声）。"""
+    try:
+        flags = 0x1 | 0x2 | 0x4  # NOCONFIRMATION | NOPROGRESSUI | NOSOUND
+        ctypes.windll.shell32.SHEmptyRecycleBinW(None, None, flags)
+        return True
+    except (AttributeError, OSError):
+        return False
+
+
+def _disk_free_gb(path: str = "C:\\") -> float:
+    try:
+        usage = shutil.disk_usage(path)
+    except OSError:
+        return 0.0
+    return usage.free / 1024 ** 3
+
+
+def clean_disk(elevate: bool = True) -> ToolResult:
+    """一键清理磁盘垃圾：临时文件、Windows 更新缓存、回收站、缩略图、错误报告。"""
+    if os.name != "nt":
+        return ToolResult(False, "磁盘清理目前只支持 Windows 系统")
+
+    if elevate and not _is_admin():
+        elevated = _run_elevated("disk")
+        if elevated is not None:
+            return elevated
+
+    before_free = _disk_free_gb()
+    per_item: dict[str, int] = {}
+    limited = False
+
+    for label, raw in _DISK_TARGETS:
+        folder = Path(raw)
+        if not folder.is_dir():
+            continue
+        size_before = _folder_bytes(folder)
+        _clear_folder(folder)
+        got = max(size_before - _folder_bytes(folder), 0)
+        if size_before and got < size_before * 0.5 and not _is_admin():
+            limited = True  # 部分文件被系统占用/无权限
+        per_item[label] = per_item.get(label, 0) + got
+
+    thumb = _clear_thumbnails()
+    if thumb:
+        per_item["缩略图缓存"] = thumb
+
+    steps = [
+        f"{label} {size / 1024 ** 2:.0f}MB"
+        for label, size in per_item.items()
+        if size >= 1024 * 1024
+    ]
+    if _empty_recycle_bin():
+        steps.append("清空回收站")
+
+    time.sleep(0.3)
+    after_free = _disk_free_gb()
+    gained_gb = max(after_free - before_free, 0.0)
+
+    text = (
+        f"磁盘清理完成（{'、'.join(steps)}）："
+        f"C 盘可用 {before_free:.1f}GB → {after_free:.1f}GB（释放约 {gained_gb * 1024:.0f}MB）"
+    )
+    if gained_gb < 0.05:
+        text += "；垃圾本来就清得比较干净，变化不大"
+    if limited:
+        text += "。系统临时目录/更新缓存里的部分文件需要管理员权限，点按钮时在 UAC 弹窗里点“是”会更彻底"
+
+    return ToolResult(
+        True,
+        text,
+        {
+            "steps": steps,
+            "gained_mb": round(gained_gb * 1024),
+            "free_before_gb": round(before_free, 2),
+            "free_after_gb": round(after_free, 2),
+            "privileged": _is_admin(),
+        },
+    )

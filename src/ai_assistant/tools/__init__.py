@@ -26,6 +26,7 @@ TOOL_HANDLERS: dict[str, Callable[..., ToolResult]] = {
     "system_status": desktop.system_status,
     "open_folder": desktop.open_folder,
     "optimize_memory": desktop.optimize_memory,
+    "clean_disk": desktop.clean_disk,
 }
 
 
@@ -176,7 +177,15 @@ TOOL_SPECS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "optimize_memory",
-            "description": "一键内存优化：整理各进程的闲置内存，释放物理内存并报告可用内存变化。",
+            "description": "一键内存优化：整理进程工作集、写出已修改页、清空待机内存列表与系统文件缓存。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "clean_disk",
+            "description": "一键清理磁盘垃圾：临时文件、Windows 更新缓存、回收站、缩略图缓存、错误报告。",
             "parameters": {"type": "object", "properties": {}},
         },
     },

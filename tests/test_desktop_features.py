@@ -1,4 +1,4 @@
-"""新增桌面能力（时间/网址/剪贴板/截屏/系统状态/文件夹）的测试。"""
+﻿"""新增桌面能力（时间/网址/剪贴板/截屏/系统状态/文件夹）的测试。"""
 
 from ai_assistant.core.agent import parse_local
 from ai_assistant.tools import desktop
@@ -106,3 +106,23 @@ def test_optimize_memory_runs():
         return
     result = desktop.optimize_memory(elevate=False)
     assert "整理" in result.message
+
+
+def test_parse_clean_disk():
+    """清理磁盘相关说法都应解析为 clean_disk。"""
+    for text in ("清理磁盘", "清理磁盘垃圾", "清理一下C盘垃圾", "清理系统垃圾", "清空垃圾文件"):
+        calls = parse_local(text)
+        assert calls and calls[0]["name"] == "clean_disk", text
+
+
+def test_parse_disk_status_not_clean():
+    """“磁盘空间还剩多少”仍应走 system_status，不能被清理规则截走。"""
+    calls = parse_local("磁盘空间还剩多少")
+    assert calls and calls[0]["name"] == "system_status"
+
+
+def test_clean_disk_runs_without_elevation():
+    """真实执行一次（不提权），返回成功且带释放量字段。"""
+    result = desktop.clean_disk(elevate=False)
+    assert result.success
+    assert "gained_mb" in result.data

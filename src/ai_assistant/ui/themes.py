@@ -229,7 +229,7 @@ QPushButton#chip {{
     border-radius: 10px;
     color: {theme.close_color};
     font-size: 11px;
-    padding: 2px 10px;
+    padding: 2px 7px;
 }}
 QPushButton#chip:hover {{
     background: {theme.close_hover_bg};

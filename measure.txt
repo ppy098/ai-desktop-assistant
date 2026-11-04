@@ -1,4 +1,0 @@
-panel=400x480 content=376
-chip_count=7
-widths=截屏:38@x0,时间:38@x43,剪贴板:49@x86,电脑状态:60@x140,优化内存:60@x205,清理磁盘:60@x270,清空:38@x335
-sum_btn=343 rightmost=373 overflow=False

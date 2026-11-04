@@ -14,6 +14,7 @@ from html import escape
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Qt, Signal
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -138,6 +139,8 @@ class MainPanel(QWidget):
             | Qt.Tool  # 不在任务栏显示按钮
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
+        # 自定义 QWidget 子类默认不绘制 QSS 背景，需显式开启，否则面板下半部分透明
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self.setFixedSize(PANEL_WIDTH, PANEL_HEIGHT)
         self.setObjectName("panel")
         self.apply_theme(self._theme)
@@ -216,8 +219,16 @@ class MainPanel(QWidget):
         self.update_mode(settings)
 
     # ------------------------------------------------------------------
-    # 主题 / 模式
+    # 绘制 / 主题
     # ------------------------------------------------------------------
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt 命名
+        """自绘圆角面板背景，避免依赖 QSS 对自定义 QWidget 的背景支持。"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QColor(self._theme.panel_bg))
+        painter.setPen(QPen(QColor(self._theme.panel_border), 1))
+        painter.drawRoundedRect(self.rect().adjusted(0, 0, -1, -1), 14, 14)
 
     def apply_theme(self, theme: Theme) -> None:
         """应用皮肤（QSS），并同步模式标签颜色。"""

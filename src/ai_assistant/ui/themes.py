@@ -169,7 +169,7 @@ def get_theme(name: str | None) -> Theme:
 def panel_style(theme: Theme) -> str:
     """按主题生成面板 QSS。"""
     return f"""
-QWidget#panel {{
+#panel {{
     background: {theme.panel_bg};
     border-radius: 14px;
     border: 1px solid {theme.panel_border};

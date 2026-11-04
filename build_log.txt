@@ -1,0 +1,179 @@
+﻿python.exe : 725 INFO: PyInstaller: 6.22.3, contrib hooks: 2026.9
+所在位置 行:1 字符: 98
++ ... assistant"; & ".\.venv\Scripts\python.exe" -m PyInstaller --noconfirm ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (725 INFO: PyIns...b hooks: 2026.9:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+726 INFO: Python: 3.13.16
+818 INFO: Platform: Windows-10-10.0.19045-SP0
+818 INFO: Python environment: C:\Users\Administrator\DoubaoWork\chats\2026-10-31\new-chat\ai-desktop-assistant\.venv
+820 INFO: wrote C:\Users\Administrator\DoubaoWork\chats\2026-10-31\new-chat\ai-desktop-assistant\AIDesktopAssistant.spe
+c
+826 INFO: Removing temporary files and cleaning cache in C:\Users\Administrator\AppData\Local\pyinstaller
+846 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31\\new-chat\\ai-desktop-assistant',
+ 'E:\\新建文件夹\\DoubaoWork\\app\\task-mode-resource\\python-packages',
+ 'C:\\Users\\Administrator\\AppData\\Local\\DoubaoWork\\User '
+ 'Data\\sandbox_runtime\\bases\\772984f6fd3a8ae0ae7d2422cd7c2bfa\\python\\python313.zip',
+ 'C:\\Users\\Administrator\\AppData\\Local\\DoubaoWork\\User '
+ 'Data\\sandbox_runtime\\bases\\772984f6fd3a8ae0ae7d2422cd7c2bfa\\python\\DLLs',
+ 'C:\\Users\\Administrator\\AppData\\Local\\DoubaoWork\\User '
+ 'Data\\sandbox_runtime\\bases\\772984f6fd3a8ae0ae7d2422cd7c2bfa\\python\\Lib',
+ 'C:\\Users\\Administrator\\AppData\\Local\\DoubaoWork\\User '
+ 'Data\\sandbox_runtime\\bases\\772984f6fd3a8ae0ae7d2422cd7c2bfa\\python',
+ 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv',
+ 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages',
+ 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31\\new-chat\\ai-desktop-assistant\\src',
+ 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31\\new-chat\\ai-desktop-assistant\\src']
+2127 INFO: checking Analysis
+2127 INFO: Building Analysis because Analysis-00.toc is non existent
+2127 INFO: Looking for Python shared library...
+2127 INFO: Using Python shared library: C:\Users\Administrator\AppData\Local\DoubaoWork\User Data\sandbox_runtime\bases
+\772984f6fd3a8ae0ae7d2422cd7c2bfa\python\python313.dll
+2128 INFO: Running Analysis Analysis-00.toc
+2128 INFO: Target bytecode optimization level: 0
+2128 INFO: Initializing module dependency graph...
+2134 INFO: Initializing module graph hook caches...
+2194 INFO: Analyzing modules for base_library.zip ...
+7181 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31
+\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7920 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-
+10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+13775 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10
+-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+17442 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-
+31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+18676 INFO: Caching module dependency graph...
+18756 INFO: Analyzing C:\Users\Administrator\DoubaoWork\chats\2026-10-31\new-chat\ai-desktop-assistant\src\ai_assistant
+\__main__.py
+18806 INFO: Processing standard module hook 'hook-PySide6.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-1
+0-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+19453 INFO: Processing standard module hook 'hook-shiboken6.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026
+-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+20134 INFO: Processing standard module hook 'hook-PySide6.QtNetwork.py' from 'C:\\Users\\Administrator\\DoubaoWork\\cha
+ts\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+24938 INFO: Processing standard module hook 'hook-PySide6.QtCore.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\
+\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+31054 INFO: Processing standard module hook 'hook-PySide6.QtWidgets.py' from 'C:\\Users\\Administrator\\DoubaoWork\\cha
+ts\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+39506 INFO: Processing standard module hook 'hook-PySide6.QtGui.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\
+2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+87515 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026
+-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+87532 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-1
+0-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+87715 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-
+10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+87881 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\202
+6-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+88011 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\Administrator\\DoubaoWo
+rk\\chats\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_m
+odule'
+88017 INFO: SetuptoolsInfo: initializing cached setuptools info...
+93260 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\Administrator\\DoubaoWork\\
+chats\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+94766 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31
+\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+98294 INFO: Processing standard module hook 'hook-pydantic.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-
+10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+102960 INFO: Processing standard module hook 'hook-zoneinfo.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026
+-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+109311 INFO: Processing standard module hook 'hook-anyio.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10
+-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+117743 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'C:\\Users\\Administrator\\DoubaoWork\\cha
+ts\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+117746 INFO: Setuptools: 'backports' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._ven
+dor.backports'!
+117779 INFO: Processing standard module hook 'hook-setuptools.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\20
+26-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+117860 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'C:\\Users\\Administrator\\DoubaoWork\\cha
+ts\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+118087 INFO: Processing pre-safe-import-module hook 'hook-jaraco.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\
+\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+118094 INFO: Setuptools: 'jaraco' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor
+.jaraco'!
+118196 INFO: Processing pre-safe-import-module hook 'hook-more_itertools.py' from 'C:\\Users\\Administrator\\DoubaoWork
+\\chats\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_mod
+ule'
+118214 INFO: Setuptools: 'more_itertools' appears to be a setuptools-vendored copy - creating alias to 'setuptools._ven
+dor.more_itertools'!
+119119 INFO: Processing standard module hook 'hook-_osx_support.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\
+2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+119228 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'C:\\Users\\Administrator\\DoubaoWork\\cha
+ts\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+120576 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'C:\\Users\\Administrator\\D
+oubaoWork\\chats\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+120581 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'C:\\Users\\Administrator\\Douba
+oWork\\chats\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_impor
+t_module'
+125093 INFO: Processing pre-safe-import-module hook 'hook-tomli.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\
+2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+125095 INFO: Setuptools: 'tomli' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.tomli
+'!
+128313 INFO: Processing pre-safe-import-module hook 'hook-wheel.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\
+2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+128315 INFO: Setuptools: 'wheel' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.wheel
+'!
+128724 INFO: Processing standard module hook 'hook-pygments.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026
+-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+166008 INFO: Processing module hooks (post-graph stage)...
+167621 WARNING: Hidden import "tzdata" not found!
+181139 INFO: Performing binary vs. data reclassification (124 entries)
+181636 INFO: Looking for ctypes DLLs
+181850 INFO: Analyzing run-time hooks ...
+181874 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31
+\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+181886 INFO: Including run-time hook 'pyi_rth_pyside6.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31
+\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+181895 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\Administrator\\DoubaoWork\\
+chats\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+181906 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats
+\\2026-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+181917 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10
+-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+181921 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31
+\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+181934 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\Administrator\\DoubaoWork\\chats\\20
+26-10-31\\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+182020 INFO: Creating base_library.zip...
+182093 INFO: Looking for dynamic libraries
+196730 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31\
+\new-chat\\ai-desktop-assistant\\.venv\\Lib\\site-packages\\shiboken6']
+196730 INFO: Extra DLL search directories (PATH): ['C:\\Users\\Administrator\\DoubaoWork\\chats\\2026-10-31\\new-chat\\
+ai-desktop-assistant\\.venv\\Lib\\site-packages\\PySide6']
+202321 INFO: Warnings written to C:\Users\Administrator\DoubaoWork\chats\2026-10-31\new-chat\ai-desktop-assistant\build
+\AIDesktopAssistant\warn-AIDesktopAssistant.txt
+202774 INFO: Graph cross-reference written to C:\Users\Administrator\DoubaoWork\chats\2026-10-31\new-chat\ai-desktop-as
+sistant\build\AIDesktopAssistant\xref-AIDesktopAssistant.html
+203007 INFO: checking PYZ
+203007 INFO: Building PYZ because PYZ-00.toc is non existent
+203007 INFO: Building PYZ (ZlibArchive) C:\Users\Administrator\DoubaoWork\chats\2026-10-31\new-chat\ai-desktop-assistan
+t\build\AIDesktopAssistant\PYZ-00.pyz
+204944 INFO: Building PYZ (ZlibArchive) C:\Users\Administrator\DoubaoWork\chats\2026-10-31\new-chat\ai-desktop-assistan
+t\build\AIDesktopAssistant\PYZ-00.pyz completed successfully.
+205091 INFO: checking PKG
+205092 INFO: Building PKG because PKG-00.toc is non existent
+205092 INFO: Building PKG (CArchive) AIDesktopAssistant.pkg
+205139 INFO: Building PKG (CArchive) AIDesktopAssistant.pkg completed successfully.
+205142 INFO: Bootloader C:\Users\Administrator\DoubaoWork\chats\2026-10-31\new-chat\ai-desktop-assistant\.venv\Lib\site
+-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+205142 INFO: checking EXE
+205142 INFO: Building EXE because EXE-00.toc is non existent
+205143 INFO: Building EXE from EXE-00.toc
+205144 INFO: Copying bootloader EXE to C:\Users\Administrator\DoubaoWork\chats\2026-10-31\new-chat\ai-desktop-assistant
+\build\AIDesktopAssistant\AIDesktopAssistant.exe
+205156 INFO: Copying icon to EXE
+205165 INFO: Copying 0 resources to EXE
+205165 INFO: Embedding manifest in EXE
+205172 INFO: Appending PKG archive to EXE
+205185 INFO: Fixing EXE headers
+205361 INFO: Building EXE from EXE-00.toc completed successfully.
+205368 INFO: checking COLLECT
+205369 INFO: Building COLLECT because COLLECT-00.toc is non existent
+205369 INFO: Removing dir C:\Users\Administrator\DoubaoWork\chats\2026-10-31\new-chat\ai-desktop-assistant\dist\AIDeskt
+opAssistant
+205481 INFO: Building COLLECT COLLECT-00.toc
+207196 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+207204 INFO: Build complete! The results are available in: C:\Users\Administrator\DoubaoWork\chats\2026-10-31\new-chat\
+ai-desktop-assistant\dist

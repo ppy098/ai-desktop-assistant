@@ -9,10 +9,13 @@ from __future__ import annotations
 import base64
 import ctypes
 import datetime as _dt
+import json
 import os
 import platform
 import shutil
 import subprocess
+import sys
+import time
 import webbrowser
 from pathlib import Path
 
@@ -490,13 +493,94 @@ def _empty_working_sets(min_mb: int) -> tuple[int, int, float]:
     return trimmed, skipped, touched_mb
 
 
-def optimize_memory(min_mb: int = 8) -> ToolResult:
+
+_ELEVATED_RESULT = Path.home() / ".ai_desktop_assistant" / "elevated_optimize.json"
+
+
+def _is_admin() -> bool:
+    """当前进程是否拥有管理员令牌。"""
+    try:
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except (AttributeError, OSError):
+        return False
+
+
+def _run_elevated(timeout: float = 30.0) -> ToolResult | None:
+    """以管理员身份启动自身执行一次完整优化，读取它写回的结果。
+
+    用户在弹出的 UAC 对话框里点“是”才会执行；点“否”返回 None（调用方降级）。
+    """
+    exe = sys.executable
+    if getattr(sys, "frozen", False):
+        params = "--optimize-memory"
+    else:
+        params = f"-m ai_assistant --optimize-memory"
+
+    try:
+        _ELEVATED_RESULT.unlink()
+    except OSError:
+        pass
+
+    try:
+        ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, params, None, 0)
+    except (AttributeError, OSError):
+        return None
+    if ret <= 32:  # 32 及以下都是失败，1223 = 用户在 UAC 里点了“否”
+        return None
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if _ELEVATED_RESULT.exists():
+            try:
+                payload = json.loads(_ELEVATED_RESULT.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                time.sleep(0.2)
+                continue
+            try:
+                _ELEVATED_RESULT.unlink()
+            except OSError:
+                pass
+            return ToolResult(
+                bool(payload.get("success")),
+                str(payload.get("message", "")),
+                dict(payload.get("data", {})),
+            )
+        time.sleep(0.2)
+    return None
+
+
+def _write_elevated_result(result: ToolResult) -> None:
+    """提权子进程把结果写回文件，供父进程读取。"""
+    try:
+        _ELEVATED_RESULT.parent.mkdir(parents=True, exist_ok=True)
+        _ELEVATED_RESULT.write_text(
+            json.dumps(
+                {
+                    "success": result.success,
+                    "message": result.message,
+                    "data": result.data,
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
+def optimize_memory(min_mb: int = 8, elevate: bool = True) -> ToolResult:
     """一键内存优化（PCL2 同款三步）：清待机列表 → 清文件缓存 → 整理进程工作集。
 
     前两步需要管理员令牌里的特权，普通权限下会自动跳过，只做第三步。
     """
     if os.name != "nt":
         return ToolResult(False, "内存优化目前只支持 Windows 系统")
+
+    # 非管理员：用 UAC 提权执行完整三步（清待机列表/文件缓存都要求管理员）
+    if elevate and not _is_admin():
+        elevated = _run_elevated()
+        if elevated is not None:
+            return elevated
 
     before = _memory_status()
     steps: list[str] = []
@@ -516,6 +600,7 @@ def optimize_memory(min_mb: int = 8) -> ToolResult:
     if trimmed:
         steps.append(f"整理 {trimmed} 个进程工作集")
 
+    time.sleep(0.8)  # 清空待机列表后系统需要一点时间把页转为空闲，等一下再统计更准
     after = _memory_status()
 
     if not steps:
@@ -534,7 +619,7 @@ def optimize_memory(min_mb: int = 8) -> ToolResult:
         text = f"内存优化完成（{'、'.join(steps)}）"
 
     if limited:
-        text += "。清空待机列表/系统缓存需要管理员权限，以管理员身份运行会更彻底"
+        text += "。清空待机列表/系统缓存需要管理员权限，请在 UAC 弹窗里点“是”，或在 UAC 取消后重试"
 
     return ToolResult(
         True,

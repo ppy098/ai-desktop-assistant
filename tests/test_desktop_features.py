@@ -104,5 +104,5 @@ def test_optimize_memory_runs():
 
     if sys.platform != "win32":
         return
-    result = desktop.optimize_memory()
+    result = desktop.optimize_memory(elevate=False)
     assert "整理" in result.message

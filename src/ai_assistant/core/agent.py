@@ -77,6 +77,26 @@ _URL_PATTERN = re.compile(
     r"(https?://[^\s，,；;]+|www\.[^\s，,；;]+|"
     r"[A-Za-z0-9][A-Za-z0-9\-]*(?:\.[A-Za-z0-9\-]+)+(?:/[^\s，,；;]*)?)$"
 )
+_SHOW_DESKTOP_PATTERN = re.compile(
+    r"(?:显示桌面|最小化所有窗口|最小化全部窗口|露出桌面|回到桌面)"
+)
+_VOLUME_PATTERN = re.compile(
+    r"(?:静音|取消静音|解除静音|恢复声音|音量(?:调大|调小|加大|减小|提高|降低|加|减|大|小)|"
+    r"声音(?:调大|调小|大点|小点|大一点|小一点)|调大音量|调小音量)"
+)
+_LOCK_PATTERN = re.compile(r"(?:锁屏|锁定屏幕|锁定电脑|把屏幕锁上)")
+_NOTE_WRITE_PATTERN = re.compile(
+    r"^(?:帮我)?(?:记一下|记个便签|记便签|记条便签|记一条|添加便签|写个便签|备忘录)[：: ]?(.+)$"
+)
+_NOTE_READ_PATTERN = re.compile(
+    r"(?:看看|查看|念一下|读一下|显示)(?:一下)?(?:最近的)?(?:便签|笔记|备忘录)"
+)
+_CALC_PATTERN = re.compile(
+    r"^(?:帮我)?(?:算一下|算算|计算一下|计算|算)[：: ]?([0-9(（].*[0-9)）])$"
+)
+_TEXT_PATTERN = re.compile(
+    r"(?:字数统计|统计字数|多少字|转成大写|转大写|转成小写|转小写|[Bb]ase64[编解]码)"
+)
 
 
 def _clean(text: str) -> str:
@@ -101,6 +121,30 @@ def _split_segments(text: str) -> list[str]:
     return segments
 
 
+def _parse_text_tool(segment: str) -> dict | None:
+    """解析“字数统计/转大写/Base64 编码”这类指令，取冒号后的正文。"""
+    lowered = segment.lower()
+    payload = ""
+    for sep in ("：", ":"):
+        if sep in segment:
+            payload = segment.split(sep, 1)[1]
+            break
+    payload = payload.strip()
+    if not payload:
+        return None
+    if "base64编码" in lowered:
+        action = "b64encode"
+    elif "base64解码" in lowered:
+        action = "b64decode"
+    elif "大写" in segment:
+        action = "upper"
+    elif "小写" in segment:
+        action = "lower"
+    else:
+        action = "count"
+    return {"text": payload, "action": action}
+
+
 def parse_local(text: str) -> list[dict]:
     """把中文指令解析为工具调用列表，每个元素形如 {"name": ..., "arguments": {...}}。"""
     calls: list[dict] = []
@@ -120,6 +164,47 @@ def parse_local(text: str) -> list[dict]:
         if _CLIPBOARD_READ_PATTERN.search(segment) and not _CLIPBOARD_WRITE_PATTERN.match(segment):
             calls.append({"name": "get_clipboard", "arguments": {}})
             continue
+
+        # 0.61) 显示桌面
+        if _SHOW_DESKTOP_PATTERN.search(segment):
+            calls.append({"name": "show_desktop", "arguments": {}})
+            continue
+
+        # 0.62) 锁屏
+        if _LOCK_PATTERN.search(segment):
+            calls.append({"name": "lock_screen", "arguments": {}})
+            continue
+
+        # 0.63) 音量
+        if _VOLUME_PATTERN.search(segment):
+            calls.append({"name": "control_volume", "arguments": {"action": segment}})
+            continue
+
+        # 0.64) 便签
+        note_match = _NOTE_WRITE_PATTERN.match(segment)
+        if note_match:
+            content = _clean(note_match.group(1))
+            if content:
+                calls.append({"name": "quick_note", "arguments": {"text": content}})
+                continue
+        if _NOTE_READ_PATTERN.search(segment):
+            calls.append({"name": "quick_note", "arguments": {}})
+            continue
+
+        # 0.65) 算式
+        calc_match = _CALC_PATTERN.match(segment)
+        if calc_match:
+            calls.append(
+                {"name": "calculate", "arguments": {"expression": calc_match.group(1)}}
+            )
+            continue
+
+        # 0.66) 文本工具
+        if _TEXT_PATTERN.search(segment):
+            text_args = _parse_text_tool(segment)
+            if text_args:
+                calls.append({"name": "text_tool", "arguments": text_args})
+                continue
 
         # 0.7) 复制到剪贴板
         clip_match = _CLIPBOARD_WRITE_PATTERN.match(segment)

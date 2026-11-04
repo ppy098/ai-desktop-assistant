@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from .base import ToolResult
-from . import desktop, files, launcher, web
+from . import desktop, extras, files, launcher, web
 
 
 # 名称 -> 执行函数；每个函数接收关键字参数，返回 ToolResult
@@ -27,6 +27,12 @@ TOOL_HANDLERS: dict[str, Callable[..., ToolResult]] = {
     "open_folder": desktop.open_folder,
     "optimize_memory": desktop.optimize_memory,
     "clean_disk": desktop.clean_disk,
+    "control_volume": extras.control_volume,
+    "lock_screen": extras.lock_screen,
+    "quick_note": extras.quick_note,
+    "calculate": extras.calculate,
+    "text_tool": extras.text_tool,
+    "show_desktop": extras.show_desktop,
 }
 
 
@@ -186,6 +192,90 @@ TOOL_SPECS: list[dict[str, Any]] = [
         "function": {
             "name": "clean_disk",
             "description": "一键清理磁盘垃圾：临时文件、Windows 更新缓存、回收站、缩略图缓存、错误报告。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "control_volume",
+            "description": "调节系统音量：静音、取消静音、调大、调小。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "动作：静音 / 取消静音 / 调大 / 调小（可带数字，例如“调大 3”）",
+                    }
+                },
+                "required": ["action"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "lock_screen",
+            "description": "立即锁定屏幕，需要重新输入密码才能回到桌面。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "quick_note",
+            "description": "记一条便签，或查看最近记下的便签。用于“记一下…”这类速记需求。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "要记的内容；留空表示查看最近的便签",
+                    }
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "calculate",
+            "description": "计算一个数学算式，支持 + - * / // % ** 和括号。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expression": {
+                        "type": "string",
+                        "description": "算式，例如 12*8 或 ((3+5)/2)**2",
+                    }
+                },
+                "required": ["expression"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "text_tool",
+            "description": "文本处理：统计字数、转大写、转小写、Base64 编码或解码。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "要处理的文本"},
+                    "action": {
+                        "type": "string",
+                        "description": "count 字数 / upper 大写 / lower 小写 / b64encode 编码 / b64decode 解码",
+                    },
+                },
+                "required": ["text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "show_desktop",
+            "description": "最小化所有窗口露出桌面，等同 Win+D。",
             "parameters": {"type": "object", "properties": {}},
         },
     },

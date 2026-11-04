@@ -126,3 +126,65 @@ def test_clean_disk_runs_without_elevation():
     result = desktop.clean_disk(elevate=False)
     assert result.success
     assert "gained_mb" in result.data
+
+
+def test_parse_show_desktop_and_lock():
+    """显示桌面、锁屏各有独立规则，不能被“打开软件/状态查询”截走。"""
+    assert parse_local("显示桌面") == [{"name": "show_desktop", "arguments": {}}]
+    assert parse_local("锁屏") == [{"name": "lock_screen", "arguments": {}}]
+
+
+def test_parse_volume():
+    """静音与音量加减都解析成 control_volume。"""
+    for text in ("静音", "取消静音", "音量调大3", "音量调小", "声音大一点"):
+        calls = parse_local(text)
+        assert calls and calls[0]["name"] == "control_volume", text
+
+
+def test_parse_note():
+    """记便签与查看便签区分写/读。"""
+    calls = parse_local("记一下 明天买菜")
+    assert calls[0]["name"] == "quick_note" and calls[0]["arguments"]["text"] == "明天买菜"
+    calls = parse_local("看看便签")
+    assert calls == [{"name": "quick_note", "arguments": {}}]
+
+
+def test_parse_calculate_and_text_tool():
+    """算式与文本处理分别落到 calculate / text_tool。"""
+    assert parse_local("算一下 12*8")[0]["name"] == "calculate"
+    assert parse_local("统计字数：你好世界abc")[0]["arguments"]["action"] == "count"
+    assert parse_local("转大写：hello")[0]["arguments"]["action"] == "upper"
+    assert parse_local("base64编码：你好")[0]["arguments"]["action"] == "b64encode"
+
+
+def test_calculate_real():
+    """真实计算，支持中文乘除号与括号。"""
+    from ai_assistant.tools import extras
+
+    assert extras.calculate("12*8").data["result"] == "96"
+    assert extras.calculate("(3+5)/2").data["result"] == "4"
+    assert extras.calculate("2^10").data["result"] == "1024"
+    assert not extras.calculate("1/0").success
+    assert not extras.calculate("__import__('os')").success
+
+
+def test_text_tool_roundtrip():
+    """Base64 编解码往返一致，字数统计正确。"""
+    from ai_assistant.tools import extras
+
+    encoded = extras.text_tool("你好", "b64encode")
+    decoded = extras.text_tool(encoded.message, "b64decode")
+    assert decoded.message == "你好"
+    stats = extras.text_tool("abc 你好", "count")
+    assert stats.data["chars_no_space"] == 5
+
+
+def test_quick_note_roundtrip(tmp_path, monkeypatch):
+    """便签写进去后能读回来（改写到临时目录，不污染用户文件）。"""
+    from ai_assistant.tools import extras
+
+    monkeypatch.setattr(extras, "_NOTES_FILE", tmp_path / "notes.md")
+    saved = extras.quick_note("测试便签内容")
+    assert saved.success
+    listed = extras.quick_note("")
+    assert "测试便签内容" in listed.message

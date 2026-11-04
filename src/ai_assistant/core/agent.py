@@ -189,6 +189,11 @@ class Assistant:
         if not text:
             return AgentResponse(reply="请输入你想让我做的事情")
 
+        # 本地规则优先：命中关键词立即执行（毫秒级响应），不必等待大模型
+        calls = parse_local(text)
+        if calls:
+            return self._run_local(text)
+
         if self._settings.has_api_key:
             try:
                 return self._handle_online(text)
@@ -211,7 +216,12 @@ class Assistant:
         # 延迟导入，未配置 API Key 的用户无需安装 openai 也能跑本地模式
         from openai import OpenAI
 
-        client = OpenAI(base_url=self._settings.base_url, api_key=self._settings.api_key)
+        client = OpenAI(
+            base_url=self._settings.base_url,
+            api_key=self._settings.api_key,
+            timeout=120.0,
+            max_retries=1,
+        )
         messages: list[dict] = [
             {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user", "content": text},

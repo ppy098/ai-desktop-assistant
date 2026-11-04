@@ -47,6 +47,7 @@ def _run_ps(script: str, timeout: int = 25) -> tuple[bool, str]:
     try:
         proc = subprocess.run(
             cmd,
+            stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             encoding="utf-8",

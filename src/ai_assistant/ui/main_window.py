@@ -118,7 +118,23 @@ class _Worker(QObject):
         self._text = text
 
     def run(self) -> None:
-        self.finished.emit(self._assistant.handle(self._text))
+        try:
+            response = self._assistant.handle(self._text)
+        except Exception as exc:  # 兜底：任何异常都要回显，避免界面卡在“处理中”
+            import traceback
+
+            try:
+                log = _HISTORY_FILE.parent / "error.log"
+                log.parent.mkdir(parents=True, exist_ok=True)
+                with log.open("a", encoding="utf-8") as handle:
+                    handle.write(
+                        "\n[%s] %s\n%s\n"
+                        % (datetime.now().isoformat(timespec="seconds"), self._text, traceback.format_exc())
+                    )
+            except OSError:
+                pass
+            response = AgentResponse(reply=f"执行出错：{exc}")
+        self.finished.emit(response)
 
 
 class MainPanel(QWidget):
@@ -131,6 +147,7 @@ class MainPanel(QWidget):
         super().__init__()
         self._assistant = Assistant(settings)
         self._thread: QThread | None = None
+        self._worker: _Worker | None = None
         self._theme = theme or get_theme(settings.theme)
 
         self.setWindowFlags(
@@ -298,6 +315,8 @@ class MainPanel(QWidget):
 
         thread = QThread(self)
         worker = _Worker(self._assistant, text)
+        # 必须保存引用：局部变量被 GC 回收后线程不会执行，界面会永远停在“处理中”
+        self._worker = worker
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.finished.connect(self._on_finished)
@@ -309,6 +328,7 @@ class MainPanel(QWidget):
 
     def _on_finished(self, response: AgentResponse) -> None:
         self._thread = None
+        self._worker = None
         self._set_busy(False)
         color = self._theme.mode_online if response.mode == "online" else self._theme.mode_local
         self._chat.append(

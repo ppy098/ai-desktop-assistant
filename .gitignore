@@ -39,3 +39,8 @@ Desktop.ini
 # ---------- 应用运行产物 ----------
 logs/
 *.log
+
+# 构建/临时日志
+build_log.txt
+*.log
+st.txt

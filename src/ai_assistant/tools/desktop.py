@@ -272,3 +272,279 @@ def open_folder(name: str) -> ToolResult:
     except OSError as exc:
         return ToolResult(False, f"打开文件夹失败：{exc}")
     return ToolResult(True, f"已打开{folder}文件夹", {"path": str(path)})
+
+
+# ----------------------------------------------------------------------
+# 一键内存优化
+# ----------------------------------------------------------------------
+
+# 这些进程不整理工作集：系统关键进程或受保护进程
+_SKIP_PROCESS_NAMES = {
+    "system",
+    "system idle process",
+    "registry",
+    "memory compression",
+    "memcompression",
+    "secure system",
+    "csrss.exe",
+    "wininit.exe",
+    "winlogon.exe",
+    "services.exe",
+    "lsass.exe",
+    "smss.exe",
+    "msmpeng.exe",
+    "dwm.exe",
+    "audiodg.exe",
+    "winlogon.exe",
+}
+
+_TH32CS_SNAPPROCESS = 0x00000002
+_PROCESS_QUERY_INFORMATION = 0x0400
+_PROCESS_SET_QUOTA = 0x0100
+
+
+class _PROCESSENTRY32W(ctypes.Structure):
+    _fields_ = [
+        ("dwSize", ctypes.c_ulong),
+        ("cntUsage", ctypes.c_ulong),
+        ("th32ProcessID", ctypes.c_ulong),
+        ("th32DefaultHeapID", ctypes.c_size_t),
+        ("th32ModuleID", ctypes.c_ulong),
+        ("cntThreads", ctypes.c_ulong),
+        ("th32ParentProcessID", ctypes.c_ulong),
+        ("pcPriClassBase", ctypes.c_long),
+        ("dwFlags", ctypes.c_ulong),
+        ("szExeFile", ctypes.c_wchar * 260),
+    ]
+
+
+class _PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+    _fields_ = [
+        ("cb", ctypes.c_ulong),
+        ("PageFaultCount", ctypes.c_ulong),
+        ("PeakWorkingSetSize", ctypes.c_size_t),
+        ("WorkingSetSize", ctypes.c_size_t),
+        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+        ("PagefileUsage", ctypes.c_size_t),
+        ("PeakPagefileUsage", ctypes.c_size_t),
+    ]
+
+
+def _iter_processes() -> list[tuple[int, str]]:
+    """枚举当前系统进程，返回 (pid, 进程名小写) 列表。"""
+    kernel32 = ctypes.windll.kernel32
+    snapshot = kernel32.CreateToolhelp32Snapshot(_TH32CS_SNAPPROCESS, 0)
+    if not snapshot or snapshot == -1:  # 无效句柄
+        return []
+
+    entry = _PROCESSENTRY32W()
+    entry.dwSize = ctypes.sizeof(_PROCESSENTRY32W)
+    result: list[tuple[int, str]] = []
+    try:
+        ok = kernel32.Process32FirstW(snapshot, ctypes.byref(entry))
+        while ok:
+            result.append((int(entry.th32ProcessID), (entry.szExeFile or "").lower()))
+            ok = kernel32.Process32NextW(snapshot, ctypes.byref(entry))
+    finally:
+        kernel32.CloseHandle(snapshot)
+    return result
+
+
+# ---- 权限提升所需结构（清理待机列表 / 文件缓存都需要特权） ----
+_TOKEN_ADJUST_PRIVILEGES = 0x0020
+_TOKEN_QUERY = 0x0008
+_SE_PRIVILEGE_ENABLED = 0x0002
+_ERROR_NOT_ALL_ASSIGNED = 1300
+
+_SYSTEM_MEMORY_LIST_INFORMATION = 80
+_MEMORY_PURGE_STANDBY_LIST = 4
+
+
+class _LUID(ctypes.Structure):
+    _fields_ = [("LowPart", ctypes.c_ulong), ("HighPart", ctypes.c_long)]
+
+
+class _LUID_AND_ATTRIBUTES(ctypes.Structure):
+    _fields_ = [("Luid", _LUID), ("Attributes", ctypes.c_ulong)]
+
+
+class _TOKEN_PRIVILEGES(ctypes.Structure):
+    _fields_ = [
+        ("PrivilegeCount", ctypes.c_ulong),
+        ("Privileges", _LUID_AND_ATTRIBUTES * 1),
+    ]
+
+
+def _enable_privilege(name: str) -> bool:
+    """在当前进程令牌里启用一个特权（如 SeProfileSingleProcessPrivilege）。"""
+    try:
+        kernel32 = ctypes.windll.kernel32
+        advapi32 = ctypes.windll.advapi32
+        kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+        advapi32.OpenProcessToken.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_ulong,
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        advapi32.OpenProcessToken.restype = ctypes.c_int
+
+        token = ctypes.c_void_p()
+        if not advapi32.OpenProcessToken(
+            kernel32.GetCurrentProcess(),
+            _TOKEN_ADJUST_PRIVILEGES | _TOKEN_QUERY,
+            ctypes.byref(token),
+        ):
+            return False
+    except (AttributeError, OSError):
+        return False
+
+    try:
+        luid = _LUID()
+        if not advapi32.LookupPrivilegeValueW(None, name, ctypes.byref(luid)):
+            return False
+        state = _TOKEN_PRIVILEGES()
+        state.PrivilegeCount = 1
+        state.Privileges[0].Luid = luid
+        state.Privileges[0].Attributes = _SE_PRIVILEGE_ENABLED
+        advapi32.AdjustTokenPrivileges(token, False, ctypes.byref(state), 0, None, None)
+        # 令牌里没有该特权时 GetLastError 为 ERROR_NOT_ALL_ASSIGNED
+        return kernel32.GetLastError() != _ERROR_NOT_ALL_ASSIGNED
+    except (AttributeError, OSError):
+        return False
+    finally:
+        try:
+            ctypes.windll.kernel32.CloseHandle(ctypes.c_void_p(token.value))
+        except (AttributeError, OSError):
+            pass
+
+
+def _purge_standby_list() -> bool:
+    """清空系统待机内存列表（RAMMap 的 Empty Standby List，PCL2 同款做法）。"""
+    try:
+        ntdll = ctypes.windll.ntdll
+        ntdll.NtSetSystemInformation.restype = ctypes.c_long
+        info = ctypes.c_ulong(_MEMORY_PURGE_STANDBY_LIST)
+        status = ntdll.NtSetSystemInformation(
+            _SYSTEM_MEMORY_LIST_INFORMATION, ctypes.byref(info), ctypes.sizeof(info)
+        )
+        return status == 0
+    except (AttributeError, OSError):
+        return False
+
+
+def _flush_system_file_cache() -> bool:
+    """清理系统文件缓存（等价 RAMMap 的 Empty System Working Set）。"""
+    try:
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetSystemFileCacheSize.argtypes = [
+            ctypes.c_size_t,
+            ctypes.c_size_t,
+            ctypes.c_ulong,
+        ]
+        kernel32.SetSystemFileCacheSize.restype = ctypes.c_int
+        return bool(
+            kernel32.SetSystemFileCacheSize(ctypes.c_size_t(-1), ctypes.c_size_t(-1), 0)
+        )
+    except (AttributeError, OSError):
+        return False
+
+
+def _empty_working_sets(min_mb: int) -> tuple[int, int, float]:
+    """整理各进程工作集，返回 (整理数, 跳过数, 涉及工作集 MB)。"""
+    kernel32 = ctypes.windll.kernel32
+    psapi = ctypes.windll.psapi
+    trimmed = 0
+    skipped = 0
+    touched_mb = 0.0
+
+    for pid, name in _iter_processes():
+        if pid == 0 or name in _SKIP_PROCESS_NAMES:
+            continue
+        handle = kernel32.OpenProcess(
+            _PROCESS_QUERY_INFORMATION | _PROCESS_SET_QUOTA, False, pid
+        )
+        if not handle:
+            skipped += 1  # 系统进程或无权限，跳过
+            continue
+        try:
+            counters = _PROCESS_MEMORY_COUNTERS()
+            counters.cb = ctypes.sizeof(_PROCESS_MEMORY_COUNTERS)
+            if not psapi.GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+                skipped += 1
+                continue
+            working_set_mb = counters.WorkingSetSize / 1024 ** 2
+            if working_set_mb < min_mb:
+                skipped += 1
+                continue
+            if psapi.EmptyWorkingSet(handle):
+                trimmed += 1
+                touched_mb += working_set_mb
+            else:
+                skipped += 1
+        finally:
+            kernel32.CloseHandle(handle)
+
+    return trimmed, skipped, touched_mb
+
+
+def optimize_memory(min_mb: int = 8) -> ToolResult:
+    """一键内存优化（PCL2 同款三步）：清待机列表 → 清文件缓存 → 整理进程工作集。
+
+    前两步需要管理员令牌里的特权，普通权限下会自动跳过，只做第三步。
+    """
+    if os.name != "nt":
+        return ToolResult(False, "内存优化目前只支持 Windows 系统")
+
+    before = _memory_status()
+    steps: list[str] = []
+    limited = False
+
+    if _enable_privilege("SeProfileSingleProcessPrivilege") and _purge_standby_list():
+        steps.append("清空待机内存列表")
+    else:
+        limited = True
+
+    if _enable_privilege("SeIncreaseQuotaPrivilege") and _flush_system_file_cache():
+        steps.append("清理系统文件缓存")
+    else:
+        limited = True
+
+    trimmed, _skipped, touched_mb = _empty_working_sets(min_mb)
+    if trimmed:
+        steps.append(f"整理 {trimmed} 个进程工作集")
+
+    after = _memory_status()
+
+    if not steps:
+        return ToolResult(False, "没有可整理的内存，可能需要以管理员身份运行")
+
+    if before and after:
+        gain_mb = (after[1] - before[1]) * 1024
+        text = (
+            f"内存优化完成（{'、'.join(steps)}）："
+            f"可用内存 {before[1]:.1f}GB → {after[1]:.1f}GB"
+            f"（释放约 {max(gain_mb, 0):.0f}MB，占用 {before[2]}% → {after[2]}%）"
+        )
+        if gain_mb < 50:
+            text += "；系统内存本来就比较空闲，变化不大"
+    else:
+        text = f"内存优化完成（{'、'.join(steps)}）"
+
+    if limited:
+        text += "。清空待机列表/系统缓存需要管理员权限，以管理员身份运行会更彻底"
+
+    return ToolResult(
+        True,
+        text,
+        {
+            "steps": steps,
+            "trimmed": trimmed,
+            "touched_mb": round(touched_mb),
+            "gain_mb": round(max((after[1] - before[1]) * 1024, 0)) if before and after else None,
+            "privileged": not limited,
+        },
+    )
+

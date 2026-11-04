@@ -2,7 +2,7 @@
 
 功能：
 - 对话展示与指令输入，AI 调用在独立线程执行，避免阻塞界面；
-- 快捷指令：截屏 / 时间 / 剪贴板 / 电脑状态 / 清空对话；
+- 快捷指令：截屏 / 时间 / 剪贴板 / 电脑状态 / 优化内存 / 清空对话；
 - 对话记录持久化到 ~/.ai_desktop_assistant/history.jsonl，重启后回显最近记录。
 """
 
@@ -13,7 +13,7 @@ from datetime import datetime
 from html import escape
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QThread, Qt, Signal
+from PySide6.QtCore import QObject, QThread, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -37,7 +37,7 @@ _HISTORY_RESTORE_LIMIT = 20
 
 _WELCOME = (
     "你好，我是 AI 桌面助手。可以帮你打开软件、创建文件、浏览器搜索、"
-    "打开网址、截屏、读写剪贴板、查看电脑状态。<br>"
+    "打开网址、截屏、读写剪贴板、查看电脑状态、一键优化内存。<br>"
 )
 
 # 快捷按钮：显示文字 -> 提交的指令；指令为空表示特殊动作
@@ -46,6 +46,7 @@ _CHIPS: tuple[tuple[str, str], ...] = (
     ("时间", "现在几点"),
     ("剪贴板", "看看剪贴板"),
     ("电脑状态", "电脑状态"),
+    ("优化内存", "优化内存"),
 )
 
 
@@ -283,6 +284,12 @@ class MainPanel(QWidget):
                 self._chat.append(f"<b>你：</b>{escape(str(record['text']))}<br>")
             else:
                 self._chat.append(f"<b>助手：</b>{escape(str(record['text']))}<br><br>")
+        QTimer.singleShot(0, self._scroll_to_bottom)
+
+    def _scroll_to_bottom(self) -> None:
+        """滚动到最新一条消息（延迟到布局刷新后执行）。"""
+        bar = self._chat.verticalScrollBar()
+        bar.setValue(bar.maximum())
 
     def _clear_chat(self) -> None:
         """清空对话与历史记录。"""
@@ -312,6 +319,7 @@ class MainPanel(QWidget):
         _append_history("user", text)
         self._input.clear()
         self._set_busy(True)
+        QTimer.singleShot(0, self._scroll_to_bottom)
 
         thread = QThread(self)
         worker = _Worker(self._assistant, text)
@@ -335,6 +343,7 @@ class MainPanel(QWidget):
             f"<b style='color:{color}'>助手：</b>{escape(response.reply)}<br><br>"
         )
         _append_history("assistant", response.reply)
+        QTimer.singleShot(0, self._scroll_to_bottom)
         self._input.setFocus()
 
     def _set_busy(self, busy: bool) -> None:

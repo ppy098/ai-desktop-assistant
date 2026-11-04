@@ -16,7 +16,7 @@ from .config import Settings
 
 _SYSTEM_PROMPT = (
     "你是运行在 Windows 上的中文桌面助手。用户会用自然语言要求你打开软件、"
-    "创建文件、浏览器搜索、打开网址、截屏、读写剪贴板、查看电脑状态。"
+    "创建文件、浏览器搜索、打开网址、截屏、读写剪贴板、查看电脑状态、优化内存。"
     "请优先调用提供的工具完成动作；一条指令包含多个动作时，"
     "一次性发起全部工具调用。工具执行完成后，用一句简短中文汇报结果，不要复述参数。"
 )
@@ -27,7 +27,7 @@ _MAX_TOOL_ROUNDS = 5
 # 本地模式下 "我没听懂" 的示例提示
 _LOCAL_HINT = (
     "我没听懂这条指令，可以试试：打开记事本 / 搜一下青岛天气 / 打开 www.baidu.com / "
-    "截屏 / 现在几点 / 看看剪贴板 / 电脑状态 / 创建 todo.txt"
+    "截屏 / 现在几点 / 看看剪贴板 / 电脑状态 / 优化内存 / 创建 todo.txt"
 )
 
 
@@ -64,6 +64,10 @@ _SYSTEM_PATTERN = re.compile(
     r"磁盘空间|硬盘空间|电池|CPU占用|cpu占用|电脑卡不卡)"
 )
 _FOLDER_PATTERN = re.compile(r"^(?:帮我)?打开(桌面|文档|下载)(?:文件夹)?$")
+_MEMORY_PATTERN = re.compile(
+    r"(?:一键)?(?:优化|清理|释放|整理|腾出?)(?:一下)?(?:物理)?内存|"
+    r"内存(?:优化|清理|释放|整理)|(?:清|清理|清空|释放)(?:一下)?内存|优化(?:一下)?内存"
+)
 _URL_PATTERN = re.compile(
     r"^(?:请)?(?:帮我)?(?:打开|访问|浏览|前往)\s*(?:一下)?\s*(?:网页|网址)?\s*[：:]?\s*"
     r"(https?://[^\s，,；;]+|www\.[^\s，,；;]+|"
@@ -120,6 +124,11 @@ def parse_local(text: str) -> list[dict]:
             if content:
                 calls.append({"name": "set_clipboard", "arguments": {"text": content}})
                 continue
+
+        # 0.75) 一键内存优化（须先于“电脑状态”，否则“优化内存”会落到状态查询）
+        if _MEMORY_PATTERN.search(segment):
+            calls.append({"name": "optimize_memory", "arguments": {}})
+            continue
 
         # 0.8) 电脑状态
         if _SYSTEM_PATTERN.search(segment):

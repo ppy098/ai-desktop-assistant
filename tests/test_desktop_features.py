@@ -83,3 +83,26 @@ def test_screenshot_actually_saves(tmp_path):
     shot = Path(path)
     if shot.exists():
         shot.unlink()
+
+
+def test_parse_optimize_memory():
+    """“优化内存 / 一键内存优化 / 清理内存 / 释放内存”都走内存优化。"""
+    for text in ("优化内存", "一键内存优化", "清理一下内存", "释放内存"):
+        calls = parse_local(text)
+        assert calls and calls[0]["name"] == "optimize_memory", text
+
+
+def test_parse_memory_status_not_optimize():
+    """“内存占用多少”仍是状态查询，不能被误判成优化。"""
+    calls = parse_local("内存占用多少")
+    assert calls and calls[0]["name"] == "system_status"
+
+
+def test_optimize_memory_runs():
+    """真实执行一次内存优化，能整理到进程并给出报告。"""
+    import sys
+
+    if sys.platform != "win32":
+        return
+    result = desktop.optimize_memory()
+    assert "整理" in result.message

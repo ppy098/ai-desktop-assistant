@@ -25,6 +25,7 @@ TOOL_HANDLERS: dict[str, Callable[..., ToolResult]] = {
     "take_screenshot": desktop.take_screenshot,
     "system_status": desktop.system_status,
     "open_folder": desktop.open_folder,
+    "optimize_memory": desktop.optimize_memory,
 }
 
 
@@ -169,6 +170,14 @@ TOOL_SPECS: list[dict[str, Any]] = [
                 },
                 "required": ["name"],
             },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "optimize_memory",
+            "description": "一键内存优化：整理各进程的闲置内存，释放物理内存并报告可用内存变化。",
+            "parameters": {"type": "object", "properties": {}},
         },
     },
 ]

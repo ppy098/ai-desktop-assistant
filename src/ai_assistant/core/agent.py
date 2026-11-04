@@ -16,12 +16,19 @@ from .config import Settings
 
 _SYSTEM_PROMPT = (
     "你是运行在 Windows 上的中文桌面助手。用户会用自然语言要求你打开软件、"
-    "创建文件或浏览器搜索。请优先调用提供的工具完成动作；一条指令包含多个动作时，"
+    "创建文件、浏览器搜索、打开网址、截屏、读写剪贴板、查看电脑状态。"
+    "请优先调用提供的工具完成动作；一条指令包含多个动作时，"
     "一次性发起全部工具调用。工具执行完成后，用一句简短中文汇报结果，不要复述参数。"
 )
 
 # 防止工具调用来回嵌套的保护上限
 _MAX_TOOL_ROUNDS = 5
+
+# 本地模式下 "我没听懂" 的示例提示
+_LOCAL_HINT = (
+    "我没听懂这条指令，可以试试：打开记事本 / 搜一下青岛天气 / 打开 www.baidu.com / "
+    "截屏 / 现在几点 / 看看剪贴板 / 电脑状态 / 创建 todo.txt"
+)
 
 
 @dataclass
@@ -42,6 +49,26 @@ _OPEN_PATTERN = re.compile(r"(?:请)?(?:帮我)?(?:打开|启动|运行一下|�
 _SEARCH_PATTERN = re.compile(r"(?:帮我)?(?:搜一下|搜索|搜|查一下|查询|查|找一下)(?:一下)?(.+)")
 _CREATE_PATTERN = re.compile(r"(?:创建|新建|建立|建一个|建个)(?:一个|个)?(.+)")
 _DIRECTORY_PATTERN = re.compile(r"在(桌面|文档|下载|desktop|documents|downloads)", re.IGNORECASE)
+
+# ---- 新增能力的关键词规则 ----
+_TIME_PATTERN = re.compile(r"(?:现在|当前)?(?:几点|几号|几日|星期几|礼拜几|时间|日期|今天星期)")
+_SCREENSHOT_PATTERN = re.compile(r"(?:帮我)?(?:截屏|截图|屏幕截图|全屏截图|抓屏)")
+_CLIPBOARD_READ_PATTERN = re.compile(
+    r"剪贴板(?:里|中)?(?:的)?(?:是|有)?(?:什么|内容|文字)?|(?:看看|查看|读取|念一下)剪贴板"
+)
+_CLIPBOARD_WRITE_PATTERN = re.compile(
+    r"^(?:帮我)?(?:复制|拷贝)(?:一下)?(?:这段|这些)?(?:文字|内容|文本)?[：:]?(.+)$"
+)
+_SYSTEM_PATTERN = re.compile(
+    r"(?:电脑状态|系统状态|运行状态|多少内存|内存占用|内存使用|内存还剩|"
+    r"磁盘空间|硬盘空间|电池|CPU占用|cpu占用|电脑卡不卡)"
+)
+_FOLDER_PATTERN = re.compile(r"^(?:帮我)?打开(桌面|文档|下载)(?:文件夹)?$")
+_URL_PATTERN = re.compile(
+    r"^(?:请)?(?:帮我)?(?:打开|访问|浏览|前往)\s*(?:一下)?\s*(?:网页|网址)?\s*[：:]?\s*"
+    r"(https?://[^\s，,；;]+|www\.[^\s，,；;]+|"
+    r"[A-Za-z0-9][A-Za-z0-9\-]*(?:\.[A-Za-z0-9\-]+)+(?:/[^\s，,；;]*)?)$"
+)
 
 
 def _clean(text: str) -> str:
@@ -71,7 +98,47 @@ def parse_local(text: str) -> list[dict]:
     calls: list[dict] = []
     for segment in _split_segments(text):
 
-        # 1) 打开软件
+        # 0) 时间
+        if _TIME_PATTERN.search(segment):
+            calls.append({"name": "get_time", "arguments": {}})
+            continue
+
+        # 0.5) 截屏
+        if _SCREENSHOT_PATTERN.search(segment):
+            calls.append({"name": "take_screenshot", "arguments": {}})
+            continue
+
+        # 0.6) 读取剪贴板
+        if _CLIPBOARD_READ_PATTERN.search(segment) and not _CLIPBOARD_WRITE_PATTERN.match(segment):
+            calls.append({"name": "get_clipboard", "arguments": {}})
+            continue
+
+        # 0.7) 复制到剪贴板
+        clip_match = _CLIPBOARD_WRITE_PATTERN.match(segment)
+        if clip_match:
+            content = _clean(clip_match.group(1))
+            if content:
+                calls.append({"name": "set_clipboard", "arguments": {"text": content}})
+                continue
+
+        # 0.8) 电脑状态
+        if _SYSTEM_PATTERN.search(segment):
+            calls.append({"name": "system_status", "arguments": {}})
+            continue
+
+        # 0.9) 打开常用文件夹
+        folder_match = _FOLDER_PATTERN.match(segment)
+        if folder_match:
+            calls.append({"name": "open_folder", "arguments": {"name": folder_match.group(1)}})
+            continue
+
+        # 1) 打开网址（须先于“打开软件”，避免把域名当成应用名）
+        url_match = _URL_PATTERN.match(segment)
+        if url_match:
+            calls.append({"name": "open_url", "arguments": {"url": url_match.group(1)}})
+            continue
+
+        # 2) 打开软件
         match = _OPEN_PATTERN.fullmatch(segment)
         if match and not _CREATE_PATTERN.fullmatch(segment):
             app_name = _clean(match.group(1))
@@ -80,7 +147,7 @@ def parse_local(text: str) -> list[dict]:
                 calls.append({"name": "open_app", "arguments": {"app_name": app_name}})
                 continue
 
-        # 2) 创建文件
+        # 3) 创建文件
         if _CREATE_PATTERN.search(segment) or _FILENAME_PATTERN.search(segment):
             file_match = _FILENAME_PATTERN.search(segment)
             if file_match:
@@ -96,7 +163,7 @@ def parse_local(text: str) -> list[dict]:
                 calls.append({"name": "create_file", "arguments": args})
                 continue
 
-        # 3) 浏览器搜索
+        # 4) 浏览器搜索
         match = _SEARCH_PATTERN.fullmatch(segment)
         if match:
             query = _clean(match.group(1))
@@ -136,10 +203,7 @@ class Assistant:
         calls = parse_local(text)
         results = [dispatch(c["name"], c["arguments"]) for c in calls]
         if not results:
-            return AgentResponse(
-                reply="我没听懂这条指令，可以试试：打开记事本 / 搜一下青岛天气 / 创建 todo.txt",
-                mode="local",
-            )
+            return AgentResponse(reply=_LOCAL_HINT, mode="local")
         summary = "；".join(r.message for r in results)
         return AgentResponse(reply=summary, results=results, mode="local")
 

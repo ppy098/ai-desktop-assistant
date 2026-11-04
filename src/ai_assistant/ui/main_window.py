@@ -1,11 +1,17 @@
 """展开面板：从悬浮球后面滑出的对话面板（无边框、圆角、非独立窗口）。
 
-保留对话展示与指令输入；AI 调用放在独立线程中执行，避免网络请求阻塞界面。
+功能：
+- 对话展示与指令输入，AI 调用在独立线程执行，避免阻塞界面；
+- 快捷指令：截屏 / 时间 / 剪贴板 / 电脑状态 / 清空对话；
+- 对话记录持久化到 ~/.ai_desktop_assistant/history.jsonl，重启后回显最近记录。
 """
 
 from __future__ import annotations
 
+import json
+from datetime import datetime
 from html import escape
+from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Qt, Signal
 from PySide6.QtWidgets import (
@@ -24,6 +30,82 @@ from .themes import Theme, get_theme, panel_style
 
 PANEL_WIDTH = 400
 PANEL_HEIGHT = 480
+
+_HISTORY_FILE = Path.home() / ".ai_desktop_assistant" / "history.jsonl"
+_HISTORY_RESTORE_LIMIT = 20
+
+_WELCOME = (
+    "你好，我是 AI 桌面助手。可以帮你打开软件、创建文件、浏览器搜索、"
+    "打开网址、截屏、读写剪贴板、查看电脑状态。<br>"
+)
+
+# 快捷按钮：显示文字 -> 提交的指令；指令为空表示特殊动作
+_CHIPS: tuple[tuple[str, str], ...] = (
+    ("截屏", "截屏"),
+    ("时间", "现在几点"),
+    ("剪贴板", "看看剪贴板"),
+    ("电脑状态", "电脑状态"),
+)
+
+
+# ----------------------------------------------------------------------
+# 对话记录持久化
+# ----------------------------------------------------------------------
+
+
+def _append_history(role: str, text: str) -> None:
+    """追加一条对话记录（失败静默，不影响主流程）。"""
+    if not text:
+        return
+    try:
+        _HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with _HISTORY_FILE.open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "role": role,
+                        "text": text,
+                        "ts": datetime.now().isoformat(timespec="seconds"),
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+
+
+def _load_history(limit: int = _HISTORY_RESTORE_LIMIT) -> list[dict]:
+    """读取最近若干条对话记录。"""
+    try:
+        if not _HISTORY_FILE.exists():
+            return []
+        lines = _HISTORY_FILE.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return []
+    records: list[dict] = []
+    for line in lines[-limit:]:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if (
+            isinstance(record, dict)
+            and record.get("role") in ("user", "assistant")
+            and str(record.get("text", "")).strip()
+        ):
+            records.append(record)
+    return records
+
+
+def _clear_history() -> None:
+    try:
+        _HISTORY_FILE.unlink()
+    except OSError:
+        pass
 
 
 class _Worker(QObject):
@@ -84,8 +166,32 @@ class MainPanel(QWidget):
 
         self._chat = QTextBrowser()
         self._chat.setObjectName("chat")
+        self._chat.setMinimumHeight(80)
         self._chat.setOpenExternalLinks(True)
-        self._chat.append("你好，我是 AI 桌面助手，可以帮你打开软件、创建文件、浏览器搜索。<br>")
+        self._chat.append(_WELCOME + "<br>")
+        self._restore_history()
+
+        # 快捷指令按钮行（独立容器固定高度，避免布局压缩后与输入框叠压）
+        chips_host = QWidget()
+        chips_host.setFixedHeight(28)
+        chips = QHBoxLayout(chips_host)
+        chips.setContentsMargins(0, 0, 0, 0)
+        chips.setSpacing(6)
+        for label, command in _CHIPS:
+            chip = QPushButton(label)
+            chip.setObjectName("chip")
+            chip.setFixedHeight(24)
+            chip.setCursor(Qt.PointingHandCursor)
+            chip.clicked.connect(lambda _checked=False, cmd=command: self._send_text(cmd))
+            chips.addWidget(chip)
+        clear_chip = QPushButton("清空")
+        clear_chip.setObjectName("chip")
+        clear_chip.setFixedHeight(24)
+        clear_chip.setCursor(Qt.PointingHandCursor)
+        clear_chip.setToolTip("清空对话记录")
+        clear_chip.clicked.connect(self._clear_chat)
+        chips.addWidget(clear_chip)
+        chips.addStretch(1)
 
         self._input = QLineEdit()
         self._input.setObjectName("input")
@@ -104,6 +210,7 @@ class MainPanel(QWidget):
         layout.setContentsMargins(12, 10, 12, 12)
         layout.addLayout(head)
         layout.addWidget(self._chat, stretch=1)
+        layout.addWidget(chips_host)
         layout.addLayout(bottom)
 
         self.update_mode(settings)
@@ -134,8 +241,39 @@ class MainPanel(QWidget):
         self.update_mode(settings)
 
     # ------------------------------------------------------------------
+    # 对话记录
+    # ------------------------------------------------------------------
+
+    def _restore_history(self) -> None:
+        """启动时回显最近对话。"""
+        records = _load_history()
+        if not records:
+            return
+        self._chat.append("<i>（已恢复上次的对话记录）</i><br><br>")
+        for record in records:
+            if record["role"] == "user":
+                self._chat.append(f"<b>你：</b>{escape(str(record['text']))}<br>")
+            else:
+                self._chat.append(f"<b>助手：</b>{escape(str(record['text']))}<br><br>")
+
+    def _clear_chat(self) -> None:
+        """清空对话与历史记录。"""
+        if self._thread is not None:
+            return
+        self._chat.clear()
+        _clear_history()
+        self._chat.append(_WELCOME + "<br>")
+
+    # ------------------------------------------------------------------
     # 对话逻辑
     # ------------------------------------------------------------------
+
+    def _send_text(self, text: str) -> None:
+        """快捷按钮：填入指令并立即发送。"""
+        if self._thread is not None or not text:
+            return
+        self._input.setText(text)
+        self._on_send()
 
     def _on_send(self) -> None:
         text = self._input.text().strip()
@@ -143,6 +281,7 @@ class MainPanel(QWidget):
             return
 
         self._chat.append(f"<b>你：</b>{escape(text)}<br>")
+        _append_history("user", text)
         self._input.clear()
         self._set_busy(True)
 
@@ -164,6 +303,7 @@ class MainPanel(QWidget):
         self._chat.append(
             f"<b style='color:{color}'>助手：</b>{escape(response.reply)}<br><br>"
         )
+        _append_history("assistant", response.reply)
         self._input.setFocus()
 
     def _set_busy(self, busy: bool) -> None:

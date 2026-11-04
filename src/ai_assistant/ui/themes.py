@@ -223,4 +223,17 @@ QPushButton#send {{
 }}
 QPushButton#send:hover {{ background: {theme.button_hover}; }}
 QPushButton#send:disabled {{ background: #a5b6cf; }}
+QPushButton#chip {{
+    background: transparent;
+    border: 1px solid {theme.input_border};
+    border-radius: 10px;
+    color: {theme.close_color};
+    font-size: 11px;
+    padding: 2px 10px;
+}}
+QPushButton#chip:hover {{
+    background: {theme.close_hover_bg};
+    border: 1px solid {theme.panel_border};
+    color: {theme.title_color};
+}}
 """

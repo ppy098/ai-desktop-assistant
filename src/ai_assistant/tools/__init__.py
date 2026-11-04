@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from .base import ToolResult
-from . import files, launcher, web
+from . import desktop, files, launcher, web
 
 
 # 名称 -> 执行函数；每个函数接收关键字参数，返回 ToolResult
@@ -18,6 +18,13 @@ TOOL_HANDLERS: dict[str, Callable[..., ToolResult]] = {
     "open_app": launcher.open_app,
     "create_file": files.create_file,
     "web_search": web.search,
+    "open_url": desktop.open_url,
+    "get_time": desktop.get_time,
+    "get_clipboard": desktop.get_clipboard,
+    "set_clipboard": desktop.set_clipboard,
+    "take_screenshot": desktop.take_screenshot,
+    "system_status": desktop.system_status,
+    "open_folder": desktop.open_folder,
 }
 
 
@@ -76,6 +83,91 @@ TOOL_SPECS: list[dict[str, Any]] = [
                     "query": {"type": "string", "description": "搜索关键词"},
                 },
                 "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_url",
+            "description": "用默认浏览器打开一个明确的网址（不是搜索）。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "网址，例如 https://www.baidu.com"},
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_time",
+            "description": "回答当前日期、星期和时间。用户问“现在几点”“今天几号”“星期几”时使用。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_clipboard",
+            "description": "读取当前剪贴板里的文本内容。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "set_clipboard",
+            "description": "把一段文本复制到剪贴板，方便用户随后粘贴。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string", "description": "要复制的文本内容"},
+                },
+                "required": ["text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "take_screenshot",
+            "description": "全屏截图并保存到桌面，返回保存路径。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string",
+                        "description": "可选，截图文件名（.png），留空自动按时间命名",
+                    }
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "system_status",
+            "description": "查看电脑状态：内存占用、磁盘使用、处理器和电池信息。",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_folder",
+            "description": "打开桌面、文档或下载文件夹。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "要打开的文件夹：桌面 / 文档 / 下载",
+                    }
+                },
+                "required": ["name"],
             },
         },
     },
